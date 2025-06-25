@@ -44,13 +44,35 @@ def check_log_directory():
             return False
 
         test_file = os.path.join(log_dir, ".health_check")
-        with open(test_file, "w") as f:
-            f.write("health_check")
+        with open(test_file, "w", encoding="utf-8") as f:
+            f.write("health_check_🔧")  # Test UTF-8 support
         os.remove(test_file)
         return True
     except Exception as e:
         print(f"Log directory check failed: {e}", file=sys.stderr)
         return False
+
+
+def check_locale_configuration():
+    """Check if LOCALE environment variable is properly configured"""
+    locale_value = os.getenv("LOCALE", "")
+
+    # LOCALE is optional, so empty is acceptable
+    if not locale_value:
+        return True
+
+    # Basic validation of locale format (language-country or language)
+    # Examples: fr-FR, en-US, zh-CN, ja-JP, es, fr, en
+    import re
+
+    locale_pattern = r"^[a-z]{2}(-[A-Z]{2})?$"
+
+    if not re.match(locale_pattern, locale_value):
+        print(f"LOCALE format appears invalid: {locale_value}. " f"Expected format: 'en-US' or 'fr'", file=sys.stderr)
+        return False
+
+    print(f"LOCALE configured: {locale_value}")
+    return True
 
 
 def check_environment():
@@ -114,6 +136,7 @@ def main():
         ("Process", check_process),
         ("Python imports", check_python_imports),
         ("Log directory", check_log_directory),
+        ("Locale configuration", check_locale_configuration),
         ("Environment", check_environment),
     ]
 
@@ -124,7 +147,8 @@ def main():
             failed_checks.append(check_name)
 
     if failed_checks:
-        print(f"Health check failed: {', '.join(failed_checks)}", file=sys.stderr)
+        failed_list = ", ".join(failed_checks)
+        print(f"Health check failed: {failed_list}", file=sys.stderr)
         sys.exit(1)
 
     print("Health check passed")
