@@ -562,10 +562,98 @@ class BaseTool(ABC):
                 paths_to_check = field_value if isinstance(field_value, list) else [field_value]
 
                 for path in paths_to_check:
-                    if path and not os.path.isabs(path):
+                    if path and not self._is_valid_absolute_path(path):
                         return f"All file paths must be FULL absolute paths. Invalid path: '{path}'"
 
         return None
+
+    def _is_valid_absolute_path(self, path: str) -> bool:
+        """
+        Validate that a path is an absolute path with enhanced Windows support.
+
+        This method provides more robust path validation than os.path.isabs() alone,
+        particularly for Windows paths with Unicode characters and various separators.
+
+        Args:
+            path: The path to validate
+
+        Returns:
+            bool: True if the path is a valid absolute path, False otherwise
+        """
+        import logging
+        import os
+        import unicodedata
+
+        logger = logging.getLogger(__name__)
+
+        if not path or not isinstance(path, str):
+            logger.debug(f"Path validation failed: empty or non-string path: {repr(path)}")
+            return False
+
+        # Normalize Unicode characters to handle accented characters properly
+        try:
+            normalized_path = unicodedata.normalize("NFC", path)
+        except (TypeError, ValueError):
+            # If normalization fails, use the original path
+            normalized_path = path
+            logger.debug(f"Unicode normalization failed for path: {repr(path)}")
+
+        # Convert to Path object for more robust checking
+        try:
+            from pathlib import Path
+
+            # Try to create a Path object - this will fail for invalid paths
+            path_obj = Path(normalized_path)
+
+            # Check if it's absolute using both os.path.isabs and Path.is_absolute
+            # This provides double validation for edge cases
+            is_abs_os = os.path.isabs(normalized_path)
+            is_abs_path = path_obj.is_absolute()
+
+            # On Windows, also check for drive letters explicitly
+            if os.name == "nt":
+                # Windows absolute paths should start with drive letter or UNC path
+                has_drive = (
+                    len(normalized_path) >= 3 and normalized_path[1:3] in (":\\", ":/") and normalized_path[0].isalpha()
+                )
+                has_unc = normalized_path.startswith(("\\\\", "//"))
+
+                # Also accept Unix-style absolute paths (starting with /) for cross-platform compatibility
+                has_unix_root = normalized_path.startswith("/")
+
+                result = (is_abs_os or is_abs_path) and (has_drive or has_unc or has_unix_root)
+
+                if not result:
+                    logger.warning(f"Windows path validation failed for: {repr(path)}")
+                    logger.warning(f"  Normalized: {repr(normalized_path)}")
+                    logger.warning(f"  os.path.isabs: {is_abs_os}")
+                    logger.warning(f"  Path.is_absolute: {is_abs_path}")
+                    logger.warning(f"  has_drive: {has_drive}")
+                    logger.warning(f"  has_unc: {has_unc}")
+                    logger.warning(f"  has_unix_root: {has_unix_root}")
+
+                return result
+            else:
+                # Unix-like systems
+                result = is_abs_os or is_abs_path
+
+                if not result:
+                    logger.warning(f"Unix path validation failed for: {repr(path)}")
+                    logger.warning(f"  Normalized: {repr(normalized_path)}")
+                    logger.warning(f"  os.path.isabs: {is_abs_os}")
+                    logger.warning(f"  Path.is_absolute: {is_abs_path}")
+
+                return result
+
+        except (OSError, ValueError, TypeError) as e:
+            # If Path creation fails, fall back to basic os.path.isabs
+            logger.warning(f"Path object creation failed for {repr(path)}: {e}")
+            fallback_result = os.path.isabs(normalized_path)
+
+            if not fallback_result:
+                logger.warning(f"Fallback path validation also failed for: {repr(path)}")
+
+            return fallback_result
 
     def _validate_token_limit(self, content: str, content_type: str = "Content") -> None:
         """
@@ -766,7 +854,6 @@ class BaseTool(ABC):
         updated_files = []
 
         for file_path in files:
-
             # Check if the filename is exactly "prompt.txt"
             # This ensures we don't match files like "myprompt.txt" or "prompt.txt.bak"
             if os.path.basename(file_path) == "prompt.txt":

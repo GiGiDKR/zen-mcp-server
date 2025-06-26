@@ -31,12 +31,20 @@ class TestFileUtils:
 
     def test_read_file_content_safe_files_allowed(self):
         """Test that safe files outside the original project root are now allowed"""
-        # In the new security model, safe files like /etc/passwd
+        import platform
+
+        # Choose appropriate test file based on platform
+        if platform.system() == "Windows":
+            test_file = "C:\\Windows\\System32\\drivers\\etc\\hosts"
+        else:
+            test_file = "/etc/passwd"
+
+        # In the new security model, safe files like /etc/passwd or hosts file
         # can be read as they're not in the dangerous paths list
-        content, tokens = read_file_content("/etc/passwd")
+        content, tokens = read_file_content(test_file)
         # Should successfully read the file
-        assert "--- BEGIN FILE: /etc/passwd ---" in content
-        assert "--- END FILE: /etc/passwd ---" in content
+        assert f"--- BEGIN FILE: {test_file} ---" in content
+        assert f"--- END FILE: {test_file} ---" in content
         assert tokens > 0
 
     def test_read_file_content_relative_path_rejected(self):
