@@ -112,7 +112,9 @@ class UserService:
         result = await self.db.execute(
             "SELECT * FROM users WHERE id = %s", (user_id,)
         )
-        user_data = result.fetchone()        if user_data:
+        user_data = result.fetchone()
+
+        if user_data:
             # Cache for 1 hour - magic number
             self.cache.setex(cache_key, 3600, json.dumps(user_data, ensure_ascii=False))
 
@@ -271,7 +273,9 @@ class UserProfile(Base):
         try:
             return json.loads(self.preferences) if self.preferences else {}
         except json.JSONDecodeError:
-            return {}    def set_preferences(self, prefs: dict):
+            return {}
+
+    def set_preferences(self, prefs: dict):
         self.preferences = json.dumps(prefs, ensure_ascii=False)
 
 class AuditLog(Base):
@@ -688,7 +692,9 @@ class PerformanceTimer:
 
             if not response_final_data.get("analysis_complete"):
                 self.logger.error("Expected analysis_complete=true for final step")
-                return False  # Check for expert analysis
+                return False
+
+            # Check for expert analysis
             if "expert_analysis" not in response_final_data:
                 self.logger.error("Missing expert_analysis in final response")
                 return False
