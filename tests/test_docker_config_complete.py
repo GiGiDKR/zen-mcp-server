@@ -83,7 +83,7 @@ class TestDockerCommandValidation:
         mock_run.return_value.returncode = 0
 
         # Standard build command
-        build_cmd = ["docker", "build", "-t", "zen-mcp-server:latest", "."]
+        build_cmd = ["docker", "build", "-t", "mcp/zen:latest", "."]
 
         import subprocess
 
@@ -105,7 +105,7 @@ class TestDockerCommandValidation:
             ".env",
             "-v",
             "logs:/app/logs",
-            "zen-mcp-server:latest",
+            "mcp/zen:latest",
             "python",
             "server.py",
         ]
@@ -128,7 +128,7 @@ class TestDockerCommandValidation:
             "/path/to/.env",
             "-v",
             "/path/to/logs:/app/logs",
-            "zen-mcp-server:latest",
+            "mcp/zen:latest",
             "python",
             "server.py",
         ]
@@ -139,7 +139,7 @@ class TestDockerCommandValidation:
         assert "--rm" in mcp_cmd  # Automatic cleanup
         assert "-i" in mcp_cmd  # Interactive mode
         assert "--env-file" in mcp_cmd  # Environment variables
-        assert "zen-mcp-server:latest" in mcp_cmd  # Image
+        assert "mcp/zen:latest" in mcp_cmd  # Image
 
 
 class TestIntegrationChecks:

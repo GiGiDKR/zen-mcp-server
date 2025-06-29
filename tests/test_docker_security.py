@@ -27,7 +27,12 @@ class TestDockerSecurity:
         content = self.dockerfile_path.read_text()
 
         # Check for user creation or switching
-        user_indicators = ["USER " in content, "useradd" in content, "adduser" in content, "RUN addgroup" in content]
+        user_indicators = [
+            "USER " in content,
+            "useradd" in content,
+            "adduser" in content,
+            "RUN addgroup" in content,
+        ]
 
         assert any(user_indicators), "Container should run as non-root user"
 
@@ -39,7 +44,12 @@ class TestDockerSecurity:
         content = self.compose_path.read_text()
 
         # Check that dangerous options are not used
-        dangerous_options = ["privileged: true", "--privileged", "cap_add:", "SYS_ADMIN"]
+        dangerous_options = [
+            "privileged: true",
+            "--privileged",
+            "cap_add:",
+            "SYS_ADMIN",
+        ]
 
         for option in dangerous_options:
             assert option not in content, f"Dangerous option {option} should not be used"
@@ -99,7 +109,13 @@ class TestDockerSecurity:
         content = self.compose_path.read_text()
 
         # Check that sensitive host paths are not mounted
-        dangerous_mounts = ["/:/", "/var/run/docker.sock:", "/etc/passwd:", "/etc/shadow:", "/root:"]
+        dangerous_mounts = [
+            "/:/",
+            "/var/run/docker.sock:",
+            "/etc/passwd:",
+            "/etc/shadow:",
+            "/root:",
+        ]
 
         for mount in dangerous_mounts:
             assert mount not in content, f"Dangerous mount {mount} should not be used"
@@ -154,7 +170,12 @@ class TestDockerSecretsHandling:
         if dockerignore.exists():
             content = dockerignore.read_text()
 
-            sensitive_files = [".env", "*.key", "*.pem", ".git"]
+            sensitive_files = [
+                ".env",
+                "*.key",
+                "*.pem",
+                ".git",
+            ]
 
             for file_pattern in sensitive_files:
                 if file_pattern not in content:
@@ -167,7 +188,12 @@ class TestDockerSecretsHandling:
     def test_no_default_api_keys(self):
         """Test that no default API keys are present"""
         # Ensure no API keys are set by default
-        api_key_vars = ["GEMINI_API_KEY", "OPENAI_API_KEY", "XAI_API_KEY", "ANTHROPIC_API_KEY"]
+        api_key_vars = [
+            "GEMINI_API_KEY",
+            "OPENAI_API_KEY",
+            "XAI_API_KEY",
+            "ANTHROPIC_API_KEY",
+        ]
 
         for var in api_key_vars:
             assert os.getenv(var) is None, f"{var} should not have a default value"
@@ -224,7 +250,11 @@ class TestDockerComplianceChecks:
             content = compose_file.read_text()
 
             # Check for security context if configured
-            security_options = ["security_opt:", "no-new-privileges:", "read_only:"]
+            security_options = [
+                "security_opt:",
+                "no-new-privileges:",
+                "read_only:",
+            ]
 
             # At least one security option should be present
             security_configured = any(opt in content for opt in security_options)

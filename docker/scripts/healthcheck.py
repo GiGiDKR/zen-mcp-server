@@ -52,28 +52,35 @@ def check_log_directory():
 
 
 def check_environment():
-    """Check if essential environment variables are present"""
+    """Check if essential environment variables are present and well-formed"""
     # At least one API key should be present
-    api_keys = [
-        "GEMINI_API_KEY",
-        "GOOGLE_API_KEY",
-        "OPENAI_API_KEY",
-        "XAI_API_KEY",
-        "DIAL_API_KEY",
-        "OPENROUTER_API_KEY",
-    ]
+    api_key_specs = {
+        "GEMINI_API_KEY": {"prefixes": ["AIza", "GEMINI", "GO"], "min_length": 32},
+        "OPENAI_API_KEY": {"prefixes": ["sk-"], "min_length": 50},
+        "OPENROUTER_API_KEY": {"prefixes": ["or-", "sk-or-"], "min_length": 40},
+        "XAI_API_KEY": {"prefixes": ["xai-"], "min_length": 20},
+        "DIAL_API_KEY": {"prefixes": ["dial-"], "min_length": 20},
+    }
 
-    has_api_key = any(os.getenv(key) for key in api_keys)
+    has_api_key = any(os.getenv(key) for key in api_key_specs)
     if not has_api_key:
         print("No API keys found in environment", file=sys.stderr)
         return False
 
-    # Validate API key formats (basic checks)
-    for key in api_keys:
+    # Validate API key formats (prefix and length)
+    for key, spec in api_key_specs.items():
         value = os.getenv(key)
         if value:
-            if len(value.strip()) < 10:
-                print(f"API key {key} appears too short or invalid", file=sys.stderr)
+            value = value.strip()
+            if len(value) < spec["min_length"]:
+                print(
+                    f"API key {key} appears too short (length {len(value)}, " f"min {spec['min_length']})",
+                    file=sys.stderr,
+                )
+                return False
+            prefixes = spec["prefixes"]
+            if not any(value.startswith(prefix) for prefix in prefixes):
+                print(f"API key {key} does not start with expected prefix " f"{prefixes}", file=sys.stderr)
                 return False
 
     return True

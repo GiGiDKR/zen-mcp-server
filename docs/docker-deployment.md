@@ -1,6 +1,24 @@
 # Docker Deployment Guide
 
-This guide covers deploying Zen MCP Server using Docker and Docker Compose for production environments.
+This document provides comprehensive instructions for deploying the **Zen MCP Server** using **Docker**. It covers environment configuration, deployment scripts, service management, health checks, and integration with MCP clients.
+
+## Summary
+
+- [Quick Start](#quick-start)
+- [Environment Configuration](#environment-configuration)
+- [Deployment Scripts](#deployment-scripts)
+- [Docker Architecture](#docker-architecture)
+- [Service Management](#service-management)
+- [Health Checks](#health-checks)
+- [Persistent Data](#persistent-data)
+- [Networking](#networking)
+- [Troubleshooting](#troubleshooting)
+- [Production Considerations](#production-considerations)
+- [Performance Tuning](#performance-tuning)
+- [Integration with MCP Clients](#integration-with-mcp-clients)
+- [Advanced Configuration](#advanced-configuration)
+- [Migration and Updates](#migration-and-updates)
+- [Support](#support)
 
 ## Quick Start
 
@@ -154,7 +172,7 @@ docker-compose ps
 docker-compose logs -f zen-mcp
 
 # View health status
-docker inspect zen-mcp-server --format='{{.State.Health.Status}}'
+docker inspect mcp/zen --format='{{.State.Health.Status}}'
 ```
 
 ### Stopping the Service
@@ -328,11 +346,12 @@ PYTHONMALLOC=pymalloc
 MALLOC_ARENA_MAX=2
 ```
 
-## Integration with Claude Desktop
+## Integration with MCP Clients
 
-Configure Claude Desktop to use the containerized server. **Choose one of the configurations below based on your needs:**
+Configure MCP clients to use the containerized server.
+**Choose one of the configurations below based on your needs:**
 
-### Option 1: Direct Docker Run (Recommended)
+### Option 1: Direct Docker Run
 
 **The simplest and most reliable option for most users.**
 
@@ -349,35 +368,14 @@ Configure Claude Desktop to use the containerized server. **Choose one of the co
         "/absolute/path/to/zen-mcp-server/.env",
         "-v",
         "/absolute/path/to/zen-mcp-server/logs:/app/logs",
-        "zen-mcp-server:latest"
+        "mcp/zen:latest"
       ]
     }
   }
 }
 ```
 
-**Exemple Windows** :
-```json
-{
-  "mcpServers": {
-    "zen-mcp": {
-      "command": "docker",
-      "args": [
-        "run",
-        "--rm",
-        "-i",
-        "--env-file",
-        "C:/path/to/zen-mcp-server/.env",
-        "-v",
-        "C:/path/to/zen-mcp-server/logs:/app/logs",
-        "zen-mcp-server:latest"
-      ]
-    }
-  }
-}
-```
-
-### Option 2: Docker Compose Run (one-shot, uses docker-compose.yml)
+### Option 2: Docker Compose Run
 
 **To use the advanced configuration from docker-compose.yml without a persistent container.**
 
@@ -387,7 +385,6 @@ Configure Claude Desktop to use the containerized server. **Choose one of the co
     "zen-mcp": {
       "command": "docker-compose",
       "args": [
-        "-f", "/absolute/path/to/zen-mcp-server/docker-compose.yml",
         "run", "--rm", "zen-mcp"
       ]
     }
@@ -395,7 +392,22 @@ Configure Claude Desktop to use the containerized server. **Choose one of the co
 }
 ```
 
-### Option 3: Inline Environment Variables (Advanced)
+**If you have a custom `docker-compose.yml` file, you can specify it like this:**
+```json
+{
+  "mcpServers": {
+    "zen-mcp": {
+      "command": "docker-compose",
+      "args": [
+        "-f", "/absolute/path/to/docker-compose.yml",
+        "run", "--rm", "zen-mcp"
+      ]
+    }
+  }
+}
+```
+
+### Option 3: Inline Environment Variables
 
 **For highly customized needs.**
 
@@ -412,7 +424,7 @@ Configure Claude Desktop to use the containerized server. **Choose one of the co
         "-e", "LOG_LEVEL=INFO",
         "-e", "DEFAULT_MODEL=auto",
         "-v", "/path/to/logs:/app/logs",
-        "zen-mcp-server:latest"
+        "mcp/zen:latest"
       ]
     }
   }
@@ -484,8 +496,6 @@ docker-compose build --no-cache
 ### Data Migration
 
 When upgrading, configuration is preserved in the named volume `zen-mcp-config`.
-
-For major version upgrades, check the [CHANGELOG](../CHANGELOG.md) for breaking changes.
 
 ## Support
 

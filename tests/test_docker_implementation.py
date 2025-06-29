@@ -80,7 +80,15 @@ class TestDockerCommands:
 
         # Simulate docker build
         subprocess.run(
-            ["docker", "build", "-t", "zen-mcp-server:latest", str(self.project_root)], capture_output=True, text=True
+            [
+                "docker",
+                "build",
+                "-t",
+                "mcp/zen:latest",
+                str(self.project_root),
+            ],
+            capture_output=True,
+            text=True,
         )
 
         mock_run.assert_called_once()
@@ -100,7 +108,7 @@ class TestDockerCommands:
             ".env",
             "-v",
             "logs:/app/logs",
-            "zen-mcp-server:latest",
+            "mcp/zen:latest",
             "python",
             "server.py",
         ]
@@ -111,7 +119,7 @@ class TestDockerCommands:
         assert "--rm" in cmd, "Must contain --rm for cleanup"
         assert "-i" in cmd, "Must contain -i for stdio"
         assert "--env-file" in cmd, "Must contain --env-file"
-        assert "zen-mcp-server:latest" in cmd, "Must reference the image"
+        assert "mcp/zen:latest" in cmd, "Must reference the image"
 
     @patch("subprocess.run")
     def test_docker_health_check(self, mock_run):
@@ -121,7 +129,14 @@ class TestDockerCommands:
 
         # Simulate health check
         subprocess.run(
-            ["docker", "run", "--rm", "zen-mcp-server:latest", "python", "/usr/local/bin/healthcheck.py"],
+            [
+                "docker",
+                "run",
+                "--rm",
+                "mcp/zen:latest",
+                "python",
+                "/usr/local/bin/healthcheck.py",
+            ],
             capture_output=True,
             text=True,
         )
@@ -197,7 +212,7 @@ class TestMCPIntegration:
                         "/path/to/.env",
                         "-v",
                         "/path/to/logs:/app/logs",
-                        "zen-mcp-server:latest",
+                        "mcp/zen:latest",
                         "python",
                         "server.py",
                     ],
@@ -217,7 +232,12 @@ class TestMCPIntegration:
     def test_stdio_communication_structure(self):
         """Test structure of stdio communication"""
         # Simulate an MCP message
-        mcp_message = {"jsonrpc": "2.0", "method": "initialize", "params": {}, "id": 1}
+        mcp_message = {
+            "jsonrpc": "2.0",
+            "method": "initialize",
+            "params": {},
+            "id": 1,
+        }
 
         # Check that the message is valid JSON
         json_str = json.dumps(mcp_message)
@@ -248,7 +268,12 @@ class TestDockerSecurity:
         if docker_compose_path.exists():
             content = docker_compose_path.read_text()
             # Look for security configurations
-            security_indicators = ["read_only", "tmpfs", "security_opt", "cap_drop"]
+            security_indicators = [
+                "read_only",
+                "tmpfs",
+                "security_opt",
+                "cap_drop",
+            ]
 
             # At least one security indicator should be present
             # Note: This test can be adjusted according to the actual implementation
@@ -263,7 +288,11 @@ class TestDockerSecurity:
             content = dockerfile_path.read_text()
 
             # Check that no API keys are hardcoded
-            sensitive_patterns = ["API_KEY=sk-", "API_KEY=gsk_", "API_KEY=xai-"]
+            sensitive_patterns = [
+                "API_KEY=sk-",
+                "API_KEY=gsk_",
+                "API_KEY=xai-",
+            ]
 
             for pattern in sensitive_patterns:
                 assert pattern not in content, f"Sensitive API key detected in Dockerfile: {pattern}"
@@ -279,7 +308,9 @@ class TestDockerPerformance:
         expected_max_size_mb = 500  # 500MB max
 
         # In production, we would do:
-        # result = subprocess.run(['docker', 'images', '--format', '{{.Size}}', 'zen-mcp-server:latest'])
+        # result = subprocess.run([
+        #     'docker', 'images', '--format', '{{.Size}}', 'zen-mcp-server:latest'
+        # ])
         # Here we simulate
         simulated_size = "294MB"  # Current observed size
 
@@ -346,7 +377,7 @@ LOG_LEVEL=INFO
             "-i",
             "--env-file",
             ".env",
-            "zen-mcp-server:latest",
+            "mcp/zen:latest",
             "python",
             "server.py",
         ]

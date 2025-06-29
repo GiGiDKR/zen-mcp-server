@@ -125,7 +125,11 @@ class TestDockerVolumeIntegration:
 
     def test_mcp_config_persistence(self):
         """Test that MCP configuration persists in named volume"""
-        mcp_config = {"models": ["gemini-2.0-flash", "gpt-4"], "default_model": "auto", "thinking_mode": "high"}
+        mcp_config = {
+            "models": ["gemini-2.0-flash", "gpt-4"],
+            "default_model": "auto",
+            "thinking_mode": "high",
+        }
 
         # Test config serialization/deserialization
         config_str = json.dumps(mcp_config)
@@ -148,7 +152,10 @@ class TestDockerVolumeIntegration:
 
     def test_volume_data_isolation(self):
         """Test that different container instances share volume data correctly"""
-        shared_data = {"instance_count": 0, "shared_state": "active"}
+        shared_data = {
+            "instance_count": 0,
+            "shared_state": "active",
+        }
 
         # Simulate multiple container instances accessing shared volume
         for _ in range(3):

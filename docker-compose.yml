@@ -4,13 +4,13 @@ services:
       context: .
       dockerfile: Dockerfile
       target: runtime
-    image: zen-mcp-server:latest
-    container_name: zen-mcp-server
-    
+    image: mcp/zen:latest
+    container_name: ${COMPOSE_PROJECT_NAME:-zen-mcp}
+
     # Container labels for traceability
     labels:
-      - "com.zen-mcp.service=zen-mcp-server"
-      - "com.zen-mcp.version=1.0.0"
+      - "com.zen-mcp.service=mcp/zen"
+      - "com.zen-mcp.version=1.0.1"
       - "com.zen-mcp.environment=production"
       - "com.zen-mcp.description=AI-powered Model Context Protocol server"
     
@@ -42,17 +42,17 @@ services:
       - DEFAULT_THINKING_MODE_THINKDEEP=${DEFAULT_THINKING_MODE_THINKDEEP:-high}
       - DISABLED_TOOLS=${DISABLED_TOOLS}
       - MAX_MCP_OUTPUT_TOKENS=${MAX_MCP_OUTPUT_TOKENS}
+      - LOCALE=${LOCALE}
       
       # Server configuration
       - PYTHONUNBUFFERED=1
       - PYTHONPATH=/app
       - TZ=${TZ:-UTC}
     
-    # Volumes for persistent data
+    # Volumes for persistent data and file access
     volumes:
       - ./logs:/app/logs
       - zen-mcp-config:/app/conf
-      - /etc/localtime:/etc/localtime:ro
     
     # Network configuration
     networks:

@@ -22,7 +22,7 @@ nano .env
 
 ```bash
 # Build the Docker image
-docker build -t zen-mcp-server:latest .
+docker build -t mcp/zen:latest .
 
 # Or use the build script (Bash)
 chmod +x docker/scripts/build.sh
@@ -41,14 +41,14 @@ docker/scripts/build.ps1
 # Run with environment file
 docker run --rm -i --env-file .env \
   -v $(pwd)/logs:/app/logs \
-  zen-mcp-server:latest
+  mcp/zen:latest
 
 # Run with inline environment variables
 docker run --rm -i \
   -e GEMINI_API_KEY="your_key_here" \
   -e LOG_LEVEL=INFO \
   -v $(pwd)/logs:/app/logs \
-  zen-mcp-server:latest
+  mcp/zen:latest
 ```
 
 #### B. Docker Compose (For Development/Monitoring)
@@ -77,7 +77,7 @@ docker ps
 docker logs <container_id>
 
 # Stop all zen-mcp containers
-docker stop $(docker ps -q --filter "ancestor=zen-mcp-server:latest")
+docker stop $(docker ps -q --filter "ancestor=mcp/zen:latest")
 
 # Remove old containers and images
 docker container prune
@@ -154,16 +154,16 @@ volumes:
 
 ```bash
 # Check if image exists
-docker images zen-mcp-server
+docker images mcp/zen
 
 # Test container interactively
-docker run --rm -it --env-file .env zen-mcp-server:latest bash
+docker run --rm -it --env-file .env mcp/zen:latest bash
 
 # Check environment variables
-docker run --rm --env-file .env zen-mcp-server:latest env | grep API
+docker run --rm --env-file .env mcp/zen:latest env | grep API
 
 # Test with minimal configuration
-docker run --rm -i -e GEMINI_API_KEY="test" zen-mcp-server:latest python server.py
+docker run --rm -i -e GEMINI_API_KEY="test" mcp/zen:latest python server.py
 ```
 
 ### MCP Connection Issues
@@ -173,7 +173,7 @@ docker run --rm -i -e GEMINI_API_KEY="test" zen-mcp-server:latest python server.
 docker run --rm hello-world
 
 # Verify container stdio
-echo '{"jsonrpc": "2.0", "method": "ping"}' | docker run --rm -i --env-file .env zen-mcp-server:latest python server.py
+echo '{"jsonrpc": "2.0", "method": "ping"}' | docker run --rm -i --env-file .env mcp/zen:latest python server.py
 
 # Check Claude Desktop logs for connection errors
 ```
@@ -182,10 +182,10 @@ echo '{"jsonrpc": "2.0", "method": "ping"}' | docker run --rm -i --env-file .env
 
 ```bash
 # Verify API keys are loaded
-docker run --rm --env-file .env zen-mcp-server:latest python -c "import os; print('GEMINI_API_KEY:', bool(os.getenv('GEMINI_API_KEY')))"
+docker run --rm --env-file .env mcp/zen:latest python -c "import os; print('GEMINI_API_KEY:', bool(os.getenv('GEMINI_API_KEY')))"
 
 # Test API connectivity
-docker run --rm --env-file .env zen-mcp-server:latest python /usr/local/bin/healthcheck.py
+docker run --rm --env-file .env mcp/zen:latest python /usr/local/bin/healthcheck.py
 ```
 
 ### Permission Issues
@@ -205,19 +205,25 @@ chmod 755 logs/
 docker stats
 
 # Run with memory limits
-docker run --rm -i --memory="512m" --env-file .env zen-mcp-server:latest
+docker run --rm -i --memory="512m" --env-file .env mcp/zen:latest
 
 # Monitor Docker logs
-docker run --rm -i --env-file .env zen-mcp-server:latest 2>&1 | tee docker.log
+docker run --rm -i --env-file .env mcp/zen:latest 2>&1 | tee docker.log
 ```
 
-## MCP Integration (Claude Desktop)
+## MCP Integration
 
-### Recommended Configuration (docker run)
+### Docker Run
+
+This configuration uses the `docker run` command to start the `zen-mcp-server` container directly.  
+- The `--env-file` option loads environment variables from a specified file.
+- The `-v` option mounts a host directory to the container for persistent log storage.
+- The `--rm` flag ensures the container is removed after it stops.
+- This approach is useful for running a single container with custom environment and volume settings.
 
 ```json
 {
-  "servers": {
+  "mcpServers": {
     "zen-docker": {
       "command": "docker",
       "args": [
@@ -228,40 +234,43 @@ docker run --rm -i --env-file .env zen-mcp-server:latest 2>&1 | tee docker.log
         "/absolute/path/to/zen-mcp-server/.env",
         "-v",
         "/absolute/path/to/zen-mcp-server/logs:/app/logs",
-        "zen-mcp-server:latest"
+        "mcp/zen:latest"
       ]
     }
   }
 }
 ```
 
-### Windows Example
+### Docker Compose
+
+This configuration uses `docker-compose run` to start the `zen-mcp` service as defined in your `docker-compose.yml` file.  
+- The `--rm` flag removes the container after it exits.
+- This is useful when you want to leverage Docker Compose for service orchestration, but only need to run a single service.
 
 ```json
 {
-  "servers": {
-    "zen-docker": {
-      "command": "docker",
+  "mcpServers": {
+    "zen-docker-run": {
+      "command": "docker-compose",
       "args": [
         "run",
         "--rm",
-        "-i",
-        "--env-file",
-        "C:/Users/YourName/path/to/zen-mcp-server/.env",
-        "-v",
-        "C:/Users/YourName/path/to/zen-mcp-server/logs:/app/logs",
-        "zen-mcp-server:latest"
+        "zen-mcp"
       ]
     }
   }
 }
 ```
 
-### Advanced Option: docker-compose run (uses compose configuration)
+### Docker Compose with Custom Configuration
+
+This configuration allows you to specify a custom `docker-compose.yml` file using the `-f` flag.  
+- Useful if you have multiple Compose files or want to override the default configuration.
+- The rest of the command is similar to the previous example, running the `zen-mcp` service and removing the container after it stops.
 
 ```json
 {
-  "servers": {
+  "mcpServers": {
     "zen-docker": {
       "command": "docker-compose",
       "args": [
@@ -304,10 +313,10 @@ CUSTOM_API_URL=
 
 ```bash
 # Test container starts correctly
-docker run --rm zen-mcp-server:latest python --version
+docker run --rm mcp/zen:latest python --version
 
 # Test health check
-docker run --rm -e GEMINI_API_KEY="test" zen-mcp-server:latest python /usr/local/bin/healthcheck.py
+docker run --rm -e GEMINI_API_KEY="test" mcp/zen:latest python /usr/local/bin/healthcheck.py
 ```
 
 ### 2. Test MCP Protocol
@@ -315,7 +324,7 @@ docker run --rm -e GEMINI_API_KEY="test" zen-mcp-server:latest python /usr/local
 ```bash
 # Test basic MCP communication
 echo '{"jsonrpc": "2.0", "method": "initialize", "params": {}}' | \
-  docker run --rm -i --env-file .env zen-mcp-server:latest python server.py
+  docker run --rm -i --env-file .env mcp/zen:latest python server.py
 ```
 
 ### 3. Validate Configuration
