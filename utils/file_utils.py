@@ -283,12 +283,13 @@ def resolve_and_validate_path(path_str: str) -> Path:
     Resolves and validates a path against security policies.
 
     This function ensures safe file access by:
-    1. Requiring absolute paths (no ambiguity)
-    2. Resolving symlinks to prevent deception
-    3. Blocking access to dangerous system directories
+    1. Converting paths for current execution mode (Docker vs local)
+    2. Requiring absolute paths (no ambiguity)
+    3. Resolving symlinks to prevent deception
+    4. Blocking access to dangerous system directories
 
     Args:
-        path_str: Path string (must be absolute)
+        path_str: Path string (will be converted for current mode)
 
     Returns:
         Resolved Path object that is safe to access
@@ -297,8 +298,14 @@ def resolve_and_validate_path(path_str: str) -> Path:
         ValueError: If path is not absolute or otherwise invalid
         PermissionError: If path is in a dangerous location
     """
+    # Step 0: Convert path for current execution mode
+    from utils.path_detector import get_path_detector
+
+    path_detector = get_path_detector()
+    converted_path_str = path_detector.convert_path(path_str)
+
     # Step 1: Create a Path object
-    user_path = Path(path_str)
+    user_path = Path(converted_path_str)
 
     # Step 2: Security Policy - Require absolute paths
     # Relative paths could be interpreted differently depending on working directory

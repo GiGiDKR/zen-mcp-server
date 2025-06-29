@@ -552,6 +552,11 @@ class BaseTool(ABC):
         Returns:
             Optional[str]: Error message if validation fails, None if all paths are valid
         """
+        # Import path detector for automatic path conversion
+        from utils.path_detector import get_path_detector
+
+        path_detector = get_path_detector()
+
         # Only validate files/paths if they exist in the request
         file_fields = [
             "files",
@@ -573,10 +578,23 @@ class BaseTool(ABC):
 
                 # Handle both single paths and lists of paths
                 paths_to_check = field_value if isinstance(field_value, list) else [field_value]
+                converted_paths = []
 
                 for path in paths_to_check:
-                    if path and not os.path.isabs(path):
-                        return f"All file paths must be FULL absolute paths. Invalid path: '{path}'"
+                    if path:
+                        # Convert path for current mode before validation
+                        converted_path = path_detector.convert_path(path)
+                        converted_paths.append(converted_path)
+
+                        if not os.path.isabs(converted_path):
+                            return f"All file paths must be FULL absolute paths. Invalid path: '{path}'"
+
+                # Update the request object with converted paths
+                if converted_paths:
+                    if isinstance(field_value, list):
+                        setattr(request, field_name, converted_paths)
+                    else:
+                        setattr(request, field_name, converted_paths[0])
 
         return None
 

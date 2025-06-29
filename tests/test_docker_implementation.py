@@ -1,5 +1,5 @@
 """
-Unit tests for Docker configuration and implementation of Zen MCP Server
+Unit tests for Docker configuration and implementation of Zen MCP Server.
 
 This module tests:
 - Docker and MCP configuration
@@ -24,28 +24,27 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 class TestDockerConfiguration:
-    """Tests for Docker configuration of Zen MCP Server"""
+    """Tests for Docker configuration of Zen MCP Server."""
 
     def setup_method(self):
-        """Setup for each test"""
+        """Setup for each test."""
         self.project_root = Path(__file__).parent.parent
         self.docker_compose_path = self.project_root / "docker-compose.yml"
         self.dockerfile_path = self.project_root / "Dockerfile"
 
     def test_dockerfile_exists(self):
-        """Test that Dockerfile exists and is valid"""
+        """Test that Dockerfile exists and is valid."""
         assert self.dockerfile_path.exists(), "Dockerfile must exist"
 
         # Check Dockerfile content
         content = self.dockerfile_path.read_text()
         assert "FROM python:" in content, "Dockerfile must have a Python base"
-        # Dockerfile uses COPY . . to copy all code
         assert "COPY . ." in content or "COPY --chown=" in content, "Dockerfile must copy source code"
         assert "CMD" in content, "Dockerfile must have a default command"
         assert "server.py" in content, "Dockerfile must reference server.py"
 
     def test_docker_compose_configuration(self):
-        """Test that docker-compose.yml is properly configured"""
+        """Test that docker-compose.yml is properly configured."""
         assert self.docker_compose_path.exists(), "docker-compose.yml must exist"
 
         # Basic YAML syntax check
@@ -55,7 +54,7 @@ class TestDockerConfiguration:
         assert "build:" in content, "Build configuration must be present"
 
     def test_environment_file_template(self):
-        """Test that an .env file template exists"""
+        """Test that an .env file template exists."""
         env_example_path = self.project_root / ".env.example"
 
         if env_example_path.exists():
@@ -66,28 +65,36 @@ class TestDockerConfiguration:
 
 
 class TestDockerCommands:
-    """Tests for Docker commands"""
+    """Tests for Docker commands."""
 
     def setup_method(self):
-        """Setup for each test"""
+        """Setup for each test."""
         self.project_root = Path(__file__).parent.parent
 
     @patch("subprocess.run")
     def test_docker_build_command(self, mock_run):
-        """Test that the docker build command works"""
+        """Test that the docker build command works."""
         mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = "Successfully built"
 
         # Simulate docker build
         subprocess.run(
-            ["docker", "build", "-t", "zen-mcp-server:latest", str(self.project_root)], capture_output=True, text=True
+            [
+                "docker",
+                "build",
+                "-t",
+                "mcp/zen:latest",
+                str(self.project_root),
+            ],
+            capture_output=True,
+            text=True,
         )
 
         mock_run.assert_called_once()
 
     @patch("subprocess.run")
     def test_docker_run_command_structure(self, mock_run):
-        """Test that the docker run command has the correct structure"""
+        """Test that the docker run command has the correct structure."""
         mock_run.return_value.returncode = 0
 
         # Recommended MCP command
@@ -100,7 +107,7 @@ class TestDockerCommands:
             ".env",
             "-v",
             "logs:/app/logs",
-            "zen-mcp-server:latest",
+            "mcp/zen:latest",
             "python",
             "server.py",
         ]
@@ -111,17 +118,24 @@ class TestDockerCommands:
         assert "--rm" in cmd, "Must contain --rm for cleanup"
         assert "-i" in cmd, "Must contain -i for stdio"
         assert "--env-file" in cmd, "Must contain --env-file"
-        assert "zen-mcp-server:latest" in cmd, "Must reference the image"
+        assert "mcp/zen:latest" in cmd, "Must reference the image"
 
     @patch("subprocess.run")
     def test_docker_health_check(self, mock_run):
-        """Test Docker health check"""
+        """Test Docker health check."""
         mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = "Health check passed"
 
         # Simulate health check
         subprocess.run(
-            ["docker", "run", "--rm", "zen-mcp-server:latest", "python", "/usr/local/bin/healthcheck.py"],
+            [
+                "docker",
+                "run",
+                "--rm",
+                "mcp/zen:latest",
+                "python",
+                "/usr/local/bin/healthcheck.py",
+            ],
             capture_output=True,
             text=True,
         )
@@ -130,14 +144,12 @@ class TestDockerCommands:
 
 
 class TestEnvironmentValidation:
-    """Tests for environment variable validation"""
+    """Tests for environment variable validation."""
 
     def test_required_api_keys_validation(self):
-        """Test that API key validation works"""
+        """Test that API key validation works."""
         # Test with valid API key
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test_key"}):
-            # Here we should have a function that validates the keys
-            # Let's simulate the validation logic
             has_api_key = bool(os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("XAI_API_KEY"))
             assert has_api_key, "At least one API key must be present"
 
@@ -147,8 +159,7 @@ class TestEnvironmentValidation:
             assert not has_api_key, "No API key should be present"
 
     def test_environment_file_parsing(self):
-        """Test parsing of the .env file"""
-        # Create a temporary .env file
+        """Test parsing of the .env file."""
         env_content = """
 # Test environment file
 GEMINI_API_KEY=test_gemini_key
@@ -162,7 +173,6 @@ DEFAULT_MODEL=auto
             env_file_path = f.name
 
         try:
-            # Simulate parsing of the .env file
             env_vars = {}
             with open(env_file_path) as f:
                 for line in f:
@@ -174,17 +184,15 @@ DEFAULT_MODEL=auto
             assert "GEMINI_API_KEY" in env_vars, "GEMINI_API_KEY must be parsed"
             assert env_vars["GEMINI_API_KEY"] == "test_gemini_key", "Value must be correct"
             assert env_vars["LOG_LEVEL"] == "INFO", "LOG_LEVEL must be parsed"
-
         finally:
             os.unlink(env_file_path)
 
 
 class TestMCPIntegration:
-    """Tests for MCP integration with Claude Desktop"""
+    """Tests for MCP integration with Claude Desktop."""
 
     def test_mcp_configuration_generation(self):
-        """Test MCP configuration generation"""
-        # Expected MCP configuration
+        """Test MCP configuration generation."""
         expected_config = {
             "servers": {
                 "zen-docker": {
@@ -197,7 +205,7 @@ class TestMCPIntegration:
                         "/path/to/.env",
                         "-v",
                         "/path/to/logs:/app/logs",
-                        "zen-mcp-server:latest",
+                        "mcp/zen:latest",
                         "python",
                         "server.py",
                     ],
@@ -206,7 +214,6 @@ class TestMCPIntegration:
             }
         }
 
-        # Check structure
         assert "servers" in expected_config
         zen_docker = expected_config["servers"]["zen-docker"]
         assert zen_docker["command"] == "docker"
@@ -215,11 +222,14 @@ class TestMCPIntegration:
         assert "-i" in zen_docker["args"]
 
     def test_stdio_communication_structure(self):
-        """Test structure of stdio communication"""
-        # Simulate an MCP message
-        mcp_message = {"jsonrpc": "2.0", "method": "initialize", "params": {}, "id": 1}
+        """Test structure of stdio communication."""
+        mcp_message = {
+            "jsonrpc": "2.0",
+            "method": "initialize",
+            "params": {},
+            "id": 1,
+        }
 
-        # Check that the message is valid JSON
         json_str = json.dumps(mcp_message)
         parsed = json.loads(json_str)
 
@@ -229,10 +239,10 @@ class TestMCPIntegration:
 
 
 class TestDockerSecurity:
-    """Tests for Docker security"""
+    """Tests for Docker security."""
 
     def test_non_root_user_configuration(self):
-        """Test that the container uses a non-root user"""
+        """Test that the container uses a non-root user."""
         dockerfile_path = Path(__file__).parent.parent / "Dockerfile"
 
         if dockerfile_path.exists():
@@ -241,45 +251,57 @@ class TestDockerSecurity:
             assert "USER " in content or "useradd" in content, "Dockerfile should configure a non-root user"
 
     def test_readonly_filesystem_configuration(self):
-        """Test read-only filesystem configuration"""
+        """Test read-only filesystem configuration."""
         # This configuration should be in docker-compose.yml or Dockerfile
         docker_compose_path = Path(__file__).parent.parent / "docker-compose.yml"
 
         if docker_compose_path.exists():
             content = docker_compose_path.read_text()
             # Look for security configurations
-            security_indicators = ["read_only", "tmpfs", "security_opt", "cap_drop"]
+            security_indicators = [
+                "read_only",
+                "tmpfs",
+                "security_opt",
+                "cap_drop",
+            ]
 
             # At least one security indicator should be present
-            # Note: This test can be adjusted according to the actual implementation
+            # Note: This test can be adjusted for the actual implementation
             security_found = any(indicator in content for indicator in security_indicators)
             assert security_found or True  # Flexible test
 
     def test_environment_variable_security(self):
-        """Test that sensitive environment variables are not hardcoded"""
+        """Test that sensitive environment variables are not hardcoded."""
         dockerfile_path = Path(__file__).parent.parent / "Dockerfile"
 
         if dockerfile_path.exists():
             content = dockerfile_path.read_text()
 
             # Check that no API keys are hardcoded
-            sensitive_patterns = ["API_KEY=sk-", "API_KEY=gsk_", "API_KEY=xai-"]
+            sensitive_patterns = [
+                "API_KEY=sk-",
+                "API_KEY=gsk_",
+                "API_KEY=xai-",
+            ]
 
             for pattern in sensitive_patterns:
                 assert pattern not in content, f"Sensitive API key detected in Dockerfile: {pattern}"
 
 
 class TestDockerPerformance:
-    """Tests for Docker performance"""
+    """Tests for Docker performance."""
 
     def test_image_size_optimization(self):
-        """Test that the Docker image is not excessively large"""
+        """Test that the Docker image is not excessively large."""
         # This test would require docker to be executed
         # Simulate size check
         expected_max_size_mb = 500  # 500MB max
 
         # In production, we would do:
-        # result = subprocess.run(['docker', 'images', '--format', '{{.Size}}', 'zen-mcp-server:latest'])
+        # result = subprocess.run([
+        #     'docker', 'images', '--format', '{{.Size}}',
+        #     'zen-mcp-server:latest'
+        # ])
         # Here we simulate
         simulated_size = "294MB"  # Current observed size
 
@@ -287,7 +309,7 @@ class TestDockerPerformance:
         assert size_mb <= expected_max_size_mb, f"Image too large: {size_mb}MB > {expected_max_size_mb}MB"
 
     def test_startup_time_expectations(self):
-        """Test startup time expectations"""
+        """Test startup time expectations."""
         # Conceptual test - in production we would measure actual time
         expected_startup_time_seconds = 10
 
@@ -301,7 +323,7 @@ class TestDockerPerformance:
 
 @pytest.fixture
 def temp_project_dir():
-    """Fixture to create a temporary project directory"""
+    """Fixture to create a temporary project directory."""
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
 
@@ -322,10 +344,10 @@ CMD ["python", "/app/server.py"]
 
 
 class TestIntegration:
-    """Integration tests for the entire Docker setup"""
+    """Integration tests for the entire Docker setup."""
 
     def test_complete_docker_setup_validation(self, temp_project_dir):
-        """Test complete integration of Docker setup"""
+        """Test complete integration of Docker setup."""
         # Create an .env file
         env_content = """
 GEMINI_API_KEY=test_key
@@ -346,7 +368,7 @@ LOG_LEVEL=INFO
             "-i",
             "--env-file",
             ".env",
-            "zen-mcp-server:latest",
+            "mcp/zen:latest",
             "python",
             "server.py",
         ]

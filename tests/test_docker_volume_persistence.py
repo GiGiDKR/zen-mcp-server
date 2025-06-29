@@ -28,12 +28,12 @@ class TestDockerVolumePersistence:
         content = self.docker_compose_path.read_text()
 
         # Check for named volume definition
-        assert "zen-mcp-config:" in content, "zen-mcp-config volume must be defined"
+        assert "config:" in content, "config volume must be defined"
         assert "driver: local" in content, "Named volume must use local driver"
 
         # Check for volume mounts in service
         assert "./logs:/app/logs" in content, "Logs volume mount required"
-        assert "zen-mcp-config:/app/conf" in content, "Config volume mount required"
+        assert "config:/app/conf" in content, "Config volume mount required"
 
     def test_persistent_volume_creation(self):
         """Test that persistent volumes are created correctly"""
@@ -47,13 +47,18 @@ class TestDockerVolumePersistence:
             mock_run.return_value.stdout = f"{volume_name}\n"
 
             # Simulate docker volume ls command
-            result = subprocess.run(["docker", "volume", "ls", "--format", "{{.Name}}"], capture_output=True, text=True)
+            result = subprocess.run(
+                ["docker", "volume", "ls", "--format", "{{.Name}}"],
+                capture_output=True,
+                text=True,
+            )
 
             assert volume_name in result.stdout
 
     def test_configuration_persistence_between_runs(self):
         """Test that configuration persists between container runs"""
-        # This is a conceptual test - in practice you'd need a real Docker environment
+        # This is a conceptual test - in practice you'd need a real Docker
+        # environment
         config_data = {"test_key": "test_value", "persistent": True}
 
         # Simulate writing config to persistent volume
@@ -125,7 +130,11 @@ class TestDockerVolumeIntegration:
 
     def test_mcp_config_persistence(self):
         """Test that MCP configuration persists in named volume"""
-        mcp_config = {"models": ["gemini-2.0-flash", "gpt-4"], "default_model": "auto", "thinking_mode": "high"}
+        mcp_config = {
+            "models": ["gemini-2.0-flash", "gpt-4"],
+            "default_model": "auto",
+            "thinking_mode": "high",
+        }
 
         # Test config serialization/deserialization
         config_str = json.dumps(mcp_config)
@@ -147,8 +156,13 @@ class TestDockerVolumeIntegration:
         assert "--rm" in compose_run_cmd
 
     def test_volume_data_isolation(self):
-        """Test that different container instances share volume data correctly"""
-        shared_data = {"instance_count": 0, "shared_state": "active"}
+        """
+        Test that different container instances share volume data correctly
+        """
+        shared_data = {
+            "instance_count": 0,
+            "shared_state": "active",
+        }
 
         # Simulate multiple container instances accessing shared volume
         for _ in range(3):

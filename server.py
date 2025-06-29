@@ -1248,6 +1248,13 @@ async def main():
     # Validate and configure providers based on available API keys
     configure_providers()
 
+    # Initialize path mode detector for Docker/local environment detection
+    from utils.path_detector import get_path_detector
+
+    path_detector = get_path_detector()
+    mode = path_detector.get_path_mode()
+    logger.info(f"Path mode detected: {mode}")
+
     # Log startup message
     logger.info("Zen MCP Server starting up...")
     logger.info(f"Log level: {log_level}")

@@ -132,7 +132,17 @@ class TestDockerClaudeDesktopIntegration:
         """Test validation of MCP configuration"""
         # Valid configuration
         valid_config = {
-            "mcpServers": {"zen-mcp": {"command": "docker", "args": ["run", "--rm", "-i", "zen-mcp-server:latest"]}}
+            "mcpServers": {
+                "zen-mcp": {
+                    "command": "docker",
+                    "args": [
+                        "run",
+                        "--rm",
+                        "-i",
+                        "mcp/zen:latest",
+                    ],
+                }
+            }
         }
 
         # Validate JSON serialization
@@ -150,7 +160,7 @@ class TestDockerClaudeDesktopIntegration:
                         "run",
                         "--rm",
                         "-i",  # Interactive mode for stdio
-                        "zen-mcp-server:latest",
+                        "mcp/zen:latest",
                     ],
                 }
             }
@@ -168,9 +178,9 @@ class TestDockerClaudeDesktopIntegration:
     def test_docker_image_reference(self):
         """Test that Docker image is properly referenced"""
         configs = [
-            {"image": "zen-mcp-server:latest"},
-            {"image": "zen-mcp-server:v1.0.0"},
-            {"image": "registry/zen-mcp-server:latest"},
+            {"image": "mcp/zen:latest"},
+            {"image": "mcp/zen:v1.0.0"},
+            {"image": "registry/mcp/zen:latest"},
         ]
 
         for config in configs:
@@ -187,7 +197,14 @@ class TestDockerClaudeDesktopIntegration:
             "mcpServers": {
                 "zen-mcp": {
                     "command": "docker",
-                    "args": ["run", "--rm", "-i", "--env-file", "/tmp/.env", "zen-mcp-server:latest"],
+                    "args": [
+                        "run",
+                        "--rm",
+                        "-i",
+                        "--env-file",
+                        "/tmp/.env",
+                        "mcp/zen:latest",
+                    ],
                 }
             }
         }
@@ -254,7 +271,17 @@ class TestDockerMCPErrorHandling:
         # This would test what happens when the image doesn't exist
         # In practice, Claude Desktop would show an error
         nonexistent_config = {
-            "mcpServers": {"zen-mcp": {"command": "docker", "args": ["run", "--rm", "-i", "nonexistent:latest"]}}
+            "mcpServers": {
+                "zen-mcp": {
+                    "command": "docker",
+                    "args": [
+                        "run",
+                        "--rm",
+                        "-i",
+                        "nonexistent:latest",
+                    ],
+                }
+            }
         }
 
         # Configuration should be valid even if image doesn't exist
@@ -266,7 +293,14 @@ class TestDockerMCPErrorHandling:
             "mcpServers": {
                 "zen-mcp": {
                     "command": "docker",
-                    "args": ["run", "--rm", "-i", "--env-file", "/nonexistent/.env", "zen-mcp-server:latest"],
+                    "args": [
+                        "run",
+                        "--rm",
+                        "-i",
+                        "--env-file",
+                        "/nonexistent/.env",
+                        "mcp/zen:latest",
+                    ],
                 }
             }
         }
@@ -296,7 +330,14 @@ class TestDockerMCPErrorHandling:
             "mcpServers": {
                 "zen-mcp": {
                     "command": "docker",
-                    "args": ["run", "--rm", "-i", "--memory=512m", "--cpus=1.0", "zen-mcp-server:latest"],
+                    "args": [
+                        "run",
+                        "--rm",
+                        "-i",
+                        "--memory=512m",
+                        "--cpus=1.0",
+                        "mcp/zen:latest",
+                    ],
                 }
             }
         }

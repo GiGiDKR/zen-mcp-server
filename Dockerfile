@@ -30,10 +30,10 @@ FROM python:3.11-slim AS runtime
 
 # Add metadata labels for traceability
 LABEL maintainer="Zen MCP Server Team"
-LABEL version="1.0.0"
+LABEL version="1.0.1"
 LABEL description="Zen MCP Server - AI-powered Model Context Protocol server"
-LABEL org.opencontainers.image.title="zen-mcp-server"
-LABEL org.opencontainers.image.description="AI-powered Model Context Protocol server with multi-provider support"
+LABEL org.opencontainers.image.title="mcp/zen"
+LABEL org.opencontainers.image.description="AI-powered Model Context Protocol server avec multi-provider support"
 LABEL org.opencontainers.image.version="1.0.0"
 LABEL org.opencontainers.image.source="https://github.com/BeehiveInnovations/zen-mcp-server"
 LABEL org.opencontainers.image.documentation="https://github.com/BeehiveInnovations/zen-mcp-server/blob/main/README.md"
@@ -82,3 +82,8 @@ ENV PYTHONPATH=/app
 
 # Default command
 CMD ["python", "server.py"]
+
+# Pour construire et taguer l'image Docker selon la convention MCP :
+# docker build -t mcp/zen:latest .
+# Pour publier :
+# docker push mcp/zen:latest

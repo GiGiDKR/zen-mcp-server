@@ -16,6 +16,24 @@ ENV/
 env.bak/
 venv.bak/
 
+# Python packaging/build
+__pypackages__/
+*.egg-info/
+dist/
+build/
+
+# Test/quality tool caches
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+.coverage.*
+*.cover
+pip-wheel-metadata/
+*.manifest
+*.pot
+*.po
+
 # IDE
 .vscode/
 .idea/
@@ -25,7 +43,7 @@ venv.bak/
 # OS
 .DS_Store
 Thumbs.db
-
+.ipynb_checkpoints/
 # Logs
 logs/*.log*
 *.log
