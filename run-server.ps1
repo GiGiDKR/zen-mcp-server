@@ -126,6 +126,55 @@ function Remove-LockedDirectory {
     }
 }
 
+# Manage configuration file backups with maximum 5 files retention
+function Manage-ConfigBackups {
+    param(
+        [string]$ConfigFilePath,
+        [int]$MaxBackups = 5
+    )
+    
+    if (!(Test-Path $ConfigFilePath)) {
+        Write-Warning "Configuration file not found: $ConfigFilePath"
+        return $null
+    }
+    
+    try {
+        # Create new backup with timestamp
+        $timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
+        $backupPath = "$ConfigFilePath.backup_$timestamp"
+        Copy-Item $ConfigFilePath $backupPath -ErrorAction Stop
+        
+        # Find all existing backups for this config file
+        $configDir = Split-Path $ConfigFilePath -Parent
+        $configFileName = Split-Path $ConfigFilePath -Leaf
+        $backupPattern = "$configFileName.backup_*"
+        
+        $existingBackups = Get-ChildItem -Path $configDir -Filter $backupPattern -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending
+        
+        # Keep only the most recent MaxBackups files
+        if ($existingBackups.Count -gt $MaxBackups) {
+            $backupsToRemove = $existingBackups | Select-Object -Skip $MaxBackups
+            foreach ($backup in $backupsToRemove) {
+                try {
+                    Remove-Item $backup.FullName -Force -ErrorAction Stop
+                    Write-Info "Removed old backup: $($backup.Name)"
+                } catch {
+                    Write-Warning "Could not remove old backup: $($backup.Name)"
+                }
+            }
+            Write-Success "Backup retention: kept $MaxBackups most recent backups"
+        }
+        
+        Write-Success "Backup created: $(Split-Path $backupPath -Leaf)"
+        return $backupPath
+        
+    } catch {
+        Write-Warning "Failed to create backup: $_"
+        return $null
+    }
+}
+
 # Get version from config.py
 function Get-Version {
     try {
@@ -157,6 +206,19 @@ function Clear-PythonCache {
         Write-Success "Python cache cleared"
     } catch {
         Write-Warning "Could not clear all cache files: $_"
+    }
+}
+
+# Get absolute path
+function Get-AbsolutePath {
+    param([string]$Path)
+    
+    if (Test-Path $Path) {
+        # Use Resolve-Path for full resolution
+        return Resolve-Path $Path
+    } else {
+        # Use unresolved method
+        return $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
     }
 }
 
@@ -356,7 +418,7 @@ function Initialize-Environment {
                 Write-Success "Virtual environment already exists"
                 $pythonPath = "$VENV_PATH\Scripts\python.exe"
                 if (Test-Path $pythonPath) {
-                    return $pythonPath
+                    return Get-AbsolutePath $pythonPath
                 }
             }
         }
@@ -365,15 +427,8 @@ function Initialize-Environment {
             Write-Info "Creating virtual environment with uv..."
             uv venv $VENV_PATH --python 3.12
             if ($LASTEXITCODE -eq 0) {
-                # Install pip in the uv environment for compatibility
-                Write-Info "Installing pip in uv environment..."
-                uv pip install --python "$VENV_PATH\Scripts\python.exe" pip
-                if ($LASTEXITCODE -eq 0) {
-                    Write-Success "Environment created with uv (pip installed)"
-                } else {
-                    Write-Success "Environment created with uv"
-                }
-                return "$VENV_PATH\Scripts\python.exe"
+                Write-Success "Environment created with uv"
+                return Get-AbsolutePath "$VENV_PATH\Scripts\python.exe"
             }
         } catch {
             Write-Warning "uv failed, falling back to venv"
@@ -415,7 +470,7 @@ function Initialize-Environment {
             }
         } else {
             Write-Success "Virtual environment already exists"
-            return "$VENV_PATH\Scripts\python.exe"
+            return Get-AbsolutePath "$VENV_PATH\Scripts\python.exe"
         }
     }
     
@@ -431,7 +486,7 @@ function Initialize-Environment {
     }
     
     Write-Success "Virtual environment created"
-    return "$VENV_PATH\Scripts\python.exe"
+    return Get-AbsolutePath "$VENV_PATH\Scripts\python.exe"
 }
 
 # Setup virtual environment (legacy function for compatibility)
@@ -553,18 +608,8 @@ function Install-Dependencies {
     if (Test-Uv) {
         Write-Info "Installing dependencies with uv..."
         try {
-            # Install in the virtual environment
-            uv pip install --python "$VENV_PATH\Scripts\python.exe" -r requirements.txt
+            uv pip install -r requirements.txt
             if ($LASTEXITCODE -eq 0) {
-                # Also install dev dependencies if available
-                if (Test-Path "requirements-dev.txt") {
-                    uv pip install --python "$VENV_PATH\Scripts\python.exe" -r requirements-dev.txt
-                    if ($LASTEXITCODE -eq 0) {
-                        Write-Success "Development dependencies installed with uv"
-                    } else {
-                        Write-Warning "Failed to install dev dependencies with uv, continuing..."
-                    }
-                }
                 Write-Success "Dependencies installed with uv"
                 return
             }
@@ -698,9 +743,8 @@ function Test-ClaudeDesktopIntegration {
         if (Test-Path $claudeConfigPath) {
             Write-Info "Updating existing Claude Desktop config..."
             
-            # Create backup
-            $backupPath = "$claudeConfigPath.backup_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
-            Copy-Item $claudeConfigPath $backupPath
+            # Create backup with retention management
+            $backupPath = Manage-ConfigBackups $claudeConfigPath 5
             
             # Read existing config
             $existingContent = Get-Content $claudeConfigPath -Raw
@@ -821,7 +865,7 @@ if exist ".zen_venv\Scripts\python.exe" (
 ) else (
     python server.py %*
 )
-"@ | Out-File -FilePath $zenWrapper -Encoding UTF8
+"@ | Out-File -FilePath $zenWrapper -Encoding ASCII
         
         Write-Success "Created zen-mcp-server.cmd wrapper script"
     }
@@ -830,9 +874,8 @@ if exist ".zen_venv\Scripts\python.exe" (
     Write-Info "Updating Gemini CLI configuration..."
     
     try {
-        # Create backup
-        $backupPath = "$geminiConfig.backup_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
-        Copy-Item $geminiConfig $backupPath -ErrorAction SilentlyContinue
+        # Create backup with retention management
+        $backupPath = Manage-ConfigBackups $geminiConfig 5
         
         # Read existing config or create new one
         $config = @{}
@@ -873,6 +916,464 @@ if exist ".zen_venv\Scripts\python.exe" (
   }
 }
 "@ -ForegroundColor Yellow
+    }
+}
+
+# Check and update Cursor configuration
+function Test-CursorIntegration {
+    param([string]$PythonPath, [string]$ServerPath)
+    
+    Write-Step "Checking Cursor Integration"
+    
+    # Check if Cursor is installed
+    if (!(Test-Command "cursor")) {
+        Write-Info "Cursor not detected - skipping Cursor integration"
+        return
+    }
+    
+    Write-Info "Found Cursor"
+    
+    $cursorConfigPath = "$env:USERPROFILE\.cursor\mcp.json"
+    
+    # Check if MCP is already configured
+    if (Test-Path $cursorConfigPath) {
+        try {
+            $settings = Get-Content $cursorConfigPath -Raw | ConvertFrom-Json
+            if ($settings.mcpServers -and $settings.mcpServers.zen) {
+                Write-Success "Zen MCP already configured in Cursor"
+                return
+            }
+        } catch {
+            Write-Warning "Could not read existing Cursor configuration"
+        }
+    }
+    
+    # Ask user if they want to configure Cursor
+    Write-Host ""
+    $response = Read-Host "Configure Zen MCP for Cursor? (Y/n)"
+    if ($response -eq 'n' -or $response -eq 'N') {
+        Write-Info "Skipping Cursor integration"
+        return
+    }
+    
+    try {
+        # Create config directory if it doesn't exist
+        $configDir = Split-Path $cursorConfigPath -Parent
+        if (!(Test-Path $configDir)) {
+            New-Item -ItemType Directory -Path $configDir -Force | Out-Null
+        }
+        
+        # Create backup with retention management
+        if (Test-Path $cursorConfigPath) {
+            $backupPath = Manage-ConfigBackups $cursorConfigPath 5
+        }
+        
+        # Read existing config or create new one
+        $config = @{}
+        if (Test-Path $cursorConfigPath) {
+            $config = Get-Content $cursorConfigPath -Raw | ConvertFrom-Json
+        }
+        
+        # Ensure mcpServers exists
+        if (!$config.mcpServers) {
+            $config | Add-Member -MemberType NoteProperty -Name "mcpServers" -Value @{} -Force
+        }
+        
+        # Add zen server configuration
+        $serverConfig = @{
+            command = $PythonPath
+            args = @($ServerPath)
+        }
+        
+        $config.mcpServers | Add-Member -MemberType NoteProperty -Name "zen" -Value $serverConfig -Force
+        
+        # Write updated config
+        $config | ConvertTo-Json -Depth 10 | Out-File $cursorConfigPath -Encoding UTF8
+        
+        Write-Success "Successfully configured Cursor"
+        Write-Host "  Config: $cursorConfigPath" -ForegroundColor Gray
+        Write-Host "  Restart Cursor to use Zen MCP Server" -ForegroundColor Gray
+        
+    } catch {
+        Write-Error "Failed to update Cursor configuration: $_"
+        Write-Host ""
+        Write-Host "Manual configuration for Cursor:"
+        Write-Host "Location: $cursorConfigPath"
+        Write-Host "Add this configuration:"
+        Write-Host @"
+{
+  "mcpServers": {
+    "zen": {
+      "command": "$PythonPath",
+      "args": ["$ServerPath"]
+    }
+  }
+}
+"@ -ForegroundColor Yellow
+    }
+}
+
+# Check and update Windsurf configuration
+function Test-WindsurfIntegration {
+    param([string]$PythonPath, [string]$ServerPath)
+    
+    Write-Step "Checking Windsurf Integration"
+    
+    $windsurfConfigPath = "$env:USERPROFILE\.codeium\windsurf\mcp_config.json"
+    $windsurfAppDir = "$env:USERPROFILE\.codeium\windsurf"
+    
+    # Check if Windsurf directory exists (better detection than command)
+    if (!(Test-Path $windsurfAppDir)) {
+        Write-Info "Windsurf not detected - skipping Windsurf integration"
+        return
+    }
+    
+    Write-Info "Found Windsurf installation"
+    
+    # Check if MCP is already configured
+    if (Test-Path $windsurfConfigPath) {
+        try {
+            $settings = Get-Content $windsurfConfigPath -Raw | ConvertFrom-Json
+            if ($settings.mcpServers -and $settings.mcpServers.zen) {
+                Write-Success "Zen MCP already configured in Windsurf"
+                return
+            }
+        } catch {
+            Write-Warning "Could not read existing Windsurf configuration"
+        }
+    }
+    
+    # Ask user if they want to configure Windsurf
+    Write-Host ""
+    $response = Read-Host "Configure Zen MCP for Windsurf? (Y/n)"
+    if ($response -eq 'n' -or $response -eq 'N') {
+        Write-Info "Skipping Windsurf integration"
+        return
+    }
+    
+    try {
+        # Create config directory if it doesn't exist
+        $configDir = Split-Path $windsurfConfigPath -Parent
+        if (!(Test-Path $configDir)) {
+            New-Item -ItemType Directory -Path $configDir -Force | Out-Null
+        }
+        
+        # Create backup with retention management
+        if (Test-Path $windsurfConfigPath) {
+            $backupPath = Manage-ConfigBackups $windsurfConfigPath 5
+        }
+        
+        # Read existing config or create new one
+        $config = @{}
+        if (Test-Path $windsurfConfigPath) {
+            $config = Get-Content $windsurfConfigPath -Raw | ConvertFrom-Json
+        }
+        
+        # Ensure mcpServers exists
+        if (!$config.mcpServers) {
+            $config | Add-Member -MemberType NoteProperty -Name "mcpServers" -Value @{} -Force
+        }
+        
+        # Add zen server configuration
+        $serverConfig = @{
+            command = $PythonPath
+            args = @($ServerPath)
+        }
+        
+        $config.mcpServers | Add-Member -MemberType NoteProperty -Name "zen" -Value $serverConfig -Force
+        
+        # Write updated config
+        $config | ConvertTo-Json -Depth 10 | Out-File $windsurfConfigPath -Encoding UTF8
+        
+        Write-Success "Successfully configured Windsurf"
+        Write-Host "  Config: $windsurfConfigPath" -ForegroundColor Gray
+        Write-Host "  Restart Windsurf to use Zen MCP Server" -ForegroundColor Gray
+        
+    } catch {
+        Write-Error "Failed to update Windsurf configuration: $_"
+        Write-Host ""
+        Write-Host "Manual configuration for Windsurf:"
+        Write-Host "Location: $windsurfConfigPath"
+        Write-Host "Add this configuration:"
+        Write-Host @"
+{
+  "mcpServers": {
+    "zen": {
+      "command": "$PythonPath",
+      "args": ["$ServerPath"]
+    }
+  }
+}
+"@ -ForegroundColor Yellow
+    }
+}
+
+# Check and update Trae configuration
+function Test-TraeIntegration {
+    param([string]$PythonPath, [string]$ServerPath)
+    
+    Write-Step "Checking Trae Integration"
+    
+    $traeConfigPath = "$env:APPDATA\Trae\User\mcp.json"
+    $traeAppDir = "$env:APPDATA\Trae"
+    
+    # Check if Trae directory exists (better detection than command)
+    if (!(Test-Path $traeAppDir)) {
+        Write-Info "Trae not detected - skipping Trae integration"
+        return
+    }
+    
+    Write-Info "Found Trae installation"
+    
+    # Check if MCP is already configured
+    if (Test-Path $traeConfigPath) {
+        try {
+            $settings = Get-Content $traeConfigPath -Raw | ConvertFrom-Json
+            if ($settings.mcpServers -and $settings.mcpServers.zen) {
+                Write-Success "Zen MCP already configured in Trae"
+                return
+            }
+        } catch {
+            Write-Warning "Could not read existing Trae configuration"
+        }
+    }
+    
+    # Ask user if they want to configure Trae
+    Write-Host ""
+    $response = Read-Host "Configure Zen MCP for Trae? (Y/n)"
+    if ($response -eq 'n' -or $response -eq 'N') {
+        Write-Info "Skipping Trae integration"
+        return
+    }
+    
+    try {
+        # Create config directory if it doesn't exist
+        $configDir = Split-Path $traeConfigPath -Parent
+        if (!(Test-Path $configDir)) {
+            New-Item -ItemType Directory -Path $configDir -Force | Out-Null
+        }
+        
+        # Create backup with retention management
+        if (Test-Path $traeConfigPath) {
+            $backupPath = Manage-ConfigBackups $traeConfigPath 5
+        }
+        
+        # Read existing config or create new one
+        $config = @{}
+        if (Test-Path $traeConfigPath) {
+            $config = Get-Content $traeConfigPath -Raw | ConvertFrom-Json
+        }
+        
+        # Ensure mcpServers exists
+        if (!$config.mcpServers) {
+            $config | Add-Member -MemberType NoteProperty -Name "mcpServers" -Value @{} -Force
+        }
+        
+        # Add zen server configuration
+        $serverConfig = @{
+            command = $PythonPath
+            args = @($ServerPath)
+        }
+        
+        $config.mcpServers | Add-Member -MemberType NoteProperty -Name "zen" -Value $serverConfig -Force
+        
+        # Write updated config
+        $config | ConvertTo-Json -Depth 10 | Out-File $traeConfigPath -Encoding UTF8
+        
+        Write-Success "Successfully configured Trae"
+        Write-Host "  Config: $traeConfigPath" -ForegroundColor Gray
+        Write-Host "  Restart Trae to use Zen MCP Server" -ForegroundColor Gray
+        
+    } catch {
+        Write-Error "Failed to update Trae configuration: $_"
+        Write-Host ""
+        Write-Host "Manual configuration for Trae:"
+        Write-Host "Location: $traeConfigPath"
+        Write-Host "Add this configuration:"
+        Write-Host @"
+{
+  "mcpServers": {
+    "zen": {
+      "command": "$PythonPath",
+      "args": ["$ServerPath"]
+    }
+  }
+}
+"@ -ForegroundColor Yellow
+    }
+}
+
+# Check and update VSCode configuration
+function Test-VSCodeIntegration {
+    param([string]$PythonPath, [string]$ServerPath)
+    
+    Write-Step "Checking VSCode Integration"
+    
+    # Check for VSCode installations
+    $vscodeVersions = @()
+    
+    # VSCode standard
+    if (Test-Command "code") {
+        $vscodeVersions += @{
+            Name = "VSCode"
+            Command = "code"
+            UserPath = "$env:APPDATA\Code\User"
+        }
+    }
+    
+    # VSCode Insiders
+    if (Test-Command "code-insiders") {
+        $vscodeVersions += @{
+            Name = "VSCode Insiders"
+            Command = "code-insiders"
+            UserPath = "$env:APPDATA\Code - Insiders\User"
+        }
+    }
+    
+    if ($vscodeVersions.Count -eq 0) {
+        Write-Info "VSCode not detected - skipping VSCode integration"
+        return
+    }
+    
+    foreach ($vscode in $vscodeVersions) {
+        Write-Info "Found $($vscode.Name)"
+        
+        # Find settings.json files with modification dates
+        $settingsFiles = @()
+        $userPath = $vscode.UserPath
+        
+        # Check default profile
+        $defaultSettings = Join-Path $userPath "settings.json"
+        if (Test-Path $defaultSettings) {
+            $lastWrite = (Get-Item $defaultSettings).LastWriteTime
+            $settingsFiles += @{
+                Path = $defaultSettings
+                ProfileName = "Default Profile"
+                LastModified = $lastWrite
+            }
+        }
+        
+        # Check profiles directory
+        $profilesPath = Join-Path $userPath "profiles"
+        if (Test-Path $profilesPath) {
+            $profiles = Get-ChildItem $profilesPath -Directory
+            foreach ($profile in $profiles) {
+                $profileSettings = Join-Path $profile.FullName "settings.json"
+                if (Test-Path $profileSettings) {
+                    $lastWrite = (Get-Item $profileSettings).LastWriteTime
+                    $settingsFiles += @{
+                        Path = $profileSettings
+                        ProfileName = "Profile: $($profile.Name)"
+                        LastModified = $lastWrite
+                    }
+                }
+            }
+        }
+        
+        if ($settingsFiles.Count -eq 0) {
+            Write-Warning "No settings.json found for $($vscode.Name)"
+            continue
+        }
+        
+        # Sort by last modified date (most recent first) and take only the most recent
+        $mostRecentProfile = $settingsFiles | Sort-Object LastModified -Descending | Select-Object -First 1
+        
+        # Process only the most recent settings file
+        $settingsFile = $mostRecentProfile
+        $settingsPath = $settingsFile.Path
+        $profileName = $settingsFile.ProfileName
+        
+        # Check if MCP is already configured
+        if (Test-Path $settingsPath) {
+            try {
+                $settings = Get-Content $settingsPath -Raw | ConvertFrom-Json
+                if ($settings.mcp -and $settings.mcp.servers -and $settings.mcp.servers.zen) {
+                    Write-Success "Zen MCP already configured in $($vscode.Name)"
+                    continue
+                }
+            } catch {
+                Write-Warning "Could not read existing settings for $($vscode.Name)"
+            }
+        }
+        
+        # Ask user if they want to configure this VSCode instance
+        Write-Host ""
+        $response = Read-Host "Configure Zen MCP for $($vscode.Name)? (Y/n)"
+        if ($response -eq 'n' -or $response -eq 'N') {
+            Write-Info "Skipping $($vscode.Name)"
+            continue
+        }
+        
+                    try {
+                # Create backup with retention management
+                if (Test-Path $settingsPath) {
+                    $backupPath = Manage-ConfigBackups $settingsPath 5
+                }
+                
+                # Read existing settings as JSON string
+                $jsonContent = "{}"
+                if (Test-Path $settingsPath) {
+                    $jsonContent = Get-Content $settingsPath -Raw
+                    if (!$jsonContent.Trim()) {
+                        $jsonContent = "{}"
+                    }
+                } else {
+                    # Create directory if it doesn't exist
+                    $settingsDir = Split-Path $settingsPath -Parent
+                    if (!(Test-Path $settingsDir)) {
+                        New-Item -ItemType Directory -Path $settingsDir -Force | Out-Null
+                    }
+                }
+                
+                # Parse JSON
+                $settings = $jsonContent | ConvertFrom-Json
+                
+                # Build zen configuration
+                $zenConfigObject = New-Object PSObject
+                $zenConfigObject | Add-Member -MemberType NoteProperty -Name "command" -Value $PythonPath
+                $zenConfigObject | Add-Member -MemberType NoteProperty -Name "args" -Value @($ServerPath)
+                
+                # Build servers object
+                $serversObject = New-Object PSObject
+                $serversObject | Add-Member -MemberType NoteProperty -Name "zen" -Value $zenConfigObject
+                
+                # Build mcp object
+                $mcpObject = New-Object PSObject
+                $mcpObject | Add-Member -MemberType NoteProperty -Name "servers" -Value $serversObject
+                
+                # Add mcp to settings (replace if exists)
+                if ($settings.PSObject.Properties.Name -contains "mcp") {
+                    $settings.mcp = $mcpObject
+                } else {
+                    $settings | Add-Member -MemberType NoteProperty -Name "mcp" -Value $mcpObject
+                }
+                
+                # Write updated settings
+                $settings | ConvertTo-Json -Depth 10 | Out-File $settingsPath -Encoding UTF8
+            
+            Write-Success "Successfully configured $($vscode.Name)"
+            Write-Host "  Config: $settingsPath" -ForegroundColor Gray
+            Write-Host "  Restart $($vscode.Name) to use Zen MCP Server" -ForegroundColor Gray
+            
+        } catch {
+            Write-Error "Failed to update $($vscode.Name) settings: $_"
+            Write-Host ""
+            Write-Host "Manual configuration for $($vscode.Name):"
+            Write-Host "Location: $settingsPath"
+            Write-Host "Add this to your settings.json:"
+            Write-Host @"
+{
+  "mcp": {
+    "servers": {
+      "zen": {
+        "command": "$PythonPath",
+        "args": ["$ServerPath"]
+      }
+    }
+  }
+}
+"@ -ForegroundColor Yellow
+        }
     }
 }
 
@@ -924,7 +1425,77 @@ function Show-ConfigInstructions {
     Write-Host $geminiConfigJson -ForegroundColor Yellow
     Write-Host ""
     
-    Write-Info "3. Restart Claude Desktop or Gemini CLI after updating the config files"
+    Write-Info "3. For VSCode:"
+    Write-Host "   Add this configuration to your VSCode settings.json:"
+    Write-Host "   Location: $env:APPDATA\Code\User\<profile-id>\settings.json"
+    Write-Host ""
+    
+    $vscodeConfigJson = @{
+        mcp = @{
+            servers = @{
+                zen = @{
+                    command = $PythonPath
+                    args = @($ServerPath)
+                }
+            }
+        }
+    } | ConvertTo-Json -Depth 5
+    
+    Write-Host $vscodeConfigJson -ForegroundColor Yellow
+    Write-Host ""
+    
+    Write-Info "4. For Cursor:"
+    Write-Host "   Add this configuration to your Cursor config file:"
+    Write-Host "   Location: $env:USERPROFILE\.cursor\mcp.json"
+    Write-Host ""
+    
+    $cursorConfigJson = @{
+        mcpServers = @{
+            zen = @{
+                command = $PythonPath
+                args = @($ServerPath)
+            }
+        }
+    } | ConvertTo-Json -Depth 5
+    
+    Write-Host $cursorConfigJson -ForegroundColor Yellow
+    Write-Host ""
+    
+    Write-Info "5. For Trae:"
+    Write-Host "   Add this configuration to your Trae config file:"
+    Write-Host "   Location: $env:APPDATA\Trae\Users\mcp.json"
+    Write-Host ""
+    
+    $traeConfigJson = @{
+        mcpServers = @{
+            zen = @{
+                command = $PythonPath
+                args = @($ServerPath)
+            }
+        }
+    } | ConvertTo-Json -Depth 5
+    
+    Write-Host $traeConfigJson -ForegroundColor Yellow
+    Write-Host ""
+    
+    Write-Info "6. For Windsurf:"
+    Write-Host "   Add this configuration to your Windsurf config file:"
+    Write-Host "   Location: $env:USERPROFILE\.codeium\windsurf\mcp_config.json"
+    Write-Host ""
+    
+    $windsurfConfigJson = @{
+        mcpServers = @{
+            zen = @{
+                command = $PythonPath
+                args = @($ServerPath)
+            }
+        }
+    } | ConvertTo-Json -Depth 5
+    
+    Write-Host $windsurfConfigJson -ForegroundColor Yellow
+    Write-Host ""
+    
+    Write-Info "7. Restart Claude Desktop, Gemini CLI, VSCode, Cursor, Windsurf, or Trae after updating the config files"
     Write-Host ""
     Write-Info "Note: Claude Code (CLI) is not available on Windows (except in WSL2)"
     Write-Host ""
@@ -1119,7 +1690,7 @@ function Start-MainProcess {
         Write-Host ""
         try {
             $pythonPath = Initialize-Environment
-            $serverPath = Resolve-Path "server.py"
+            $serverPath = Get-AbsolutePath "server.py"
             Show-ConfigInstructions $pythonPath $serverPath
         } catch {
             Write-Error "Failed to setup environment: $_"
@@ -1174,7 +1745,7 @@ function Start-MainProcess {
     }
     
     # Step 7: Get absolute server path
-    $serverPath = Resolve-Path "server.py"
+    $serverPath = Get-AbsolutePath "server.py"
     
     # Step 8: Display setup instructions
     Show-SetupInstructions $pythonPath $serverPath
@@ -1183,18 +1754,30 @@ function Start-MainProcess {
     Test-ClaudeCliIntegration $pythonPath $serverPath
     Test-ClaudeDesktopIntegration $pythonPath $serverPath
     
-    # Step 10: Check Gemini CLI integration
+    # Step 10: Check VSCode integration
+    Test-VSCodeIntegration $pythonPath $serverPath
+    
+    # Step 11: Check Cursor integration  
+    Test-CursorIntegration $pythonPath $serverPath
+    
+    # Step 12: Check Windsurf integration
+    Test-WindsurfIntegration $pythonPath $serverPath
+    
+    # Step 13: Check Trae integration
+    Test-TraeIntegration $pythonPath $serverPath
+    
+    # Step 14: Check Gemini CLI integration
     Test-GeminiCliIntegration (Split-Path $serverPath -Parent)
     
-    # Step 11: Setup logging directory
+    # Step 15: Setup logging directory
     Initialize-Logging
     
-    # Step 12: Display log information
+    # Step 16: Display log information
     Write-Host ""
-    Write-Host "Logs will be written to: $(Resolve-Path $LOG_DIR)\$LOG_FILE"
+    Write-Host "Logs will be written to: $(Get-AbsolutePath $LOG_DIR)\$LOG_FILE"
     Write-Host ""
     
-    # Step 12: Handle command line arguments
+    # Step 17: Handle command line arguments
     if ($Follow) {
         Follow-Logs
     } else {
