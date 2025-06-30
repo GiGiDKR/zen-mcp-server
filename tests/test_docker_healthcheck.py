@@ -155,6 +155,6 @@ class TestDockerHealthCheckIntegration:
         start_time = time.time()
         time.sleep(0.1)  # Simulate actual work
         execution_time = time.time() - start_time
-        assert execution_time < max_execution_time, (
-            f"Health check took {execution_time}s, " f"should be < {max_execution_time}s"
-        )
+        assert (
+            execution_time < max_execution_time
+        ), f"Health check took {execution_time}s, should be < {max_execution_time}s"

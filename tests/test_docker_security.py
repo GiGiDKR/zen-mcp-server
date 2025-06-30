@@ -90,7 +90,7 @@ class TestDockerSecurity:
                         if '"' in line or "'" in line:
                             value_part = line.split("=", 1)[1].strip()
                             if len(value_part) > 10 and not value_part.startswith("$"):
-                                pytest.fail(f"Potential hardcoded secret in {file_path}: " f"{line.strip()}")
+                                pytest.fail(f"Potential hardcoded secret in {file_path}: {line.strip()}")
 
     def test_network_security(self):
         """Test network security configuration."""

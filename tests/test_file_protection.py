@@ -286,9 +286,14 @@ class TestIntegrationScenarios:
         file_paths = [str(f) for f in files]
 
         # User files should be included
-        assert any("my-awesome-project/README.md" in p for p in file_paths)
-        assert any("my-awesome-project/main.py" in p for p in file_paths)
-        assert any("src/app.py" in p for p in file_paths)
+        # Use Path operations to handle cross-platform path separators
+        readme_found = any(Path(p).parts[-2:] == ("my-awesome-project", "README.md") for p in file_paths)
+        main_found = any(Path(p).parts[-2:] == ("my-awesome-project", "main.py") for p in file_paths)
+        app_found = any(Path(p).parts[-2:] == ("src", "app.py") for p in file_paths)
+
+        assert readme_found
+        assert main_found
+        assert app_found
 
         # MCP files should NOT be included
         assert not any("gemini-mcp-server" in p for p in file_paths)

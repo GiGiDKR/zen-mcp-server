@@ -74,13 +74,13 @@ def check_environment():
             value = value.strip()
             if len(value) < spec["min_length"]:
                 print(
-                    f"API key {key} appears too short (length {len(value)}, " f"min {spec['min_length']})",
+                    f"API key {key} appears too short (length {len(value)}, min {spec['min_length']})",
                     file=sys.stderr,
                 )
                 return False
             prefixes = spec["prefixes"]
             if not any(value.startswith(prefix) for prefix in prefixes):
-                print(f"API key {key} does not start with expected prefix " f"{prefixes}", file=sys.stderr)
+                print(f"API key {key} does not start with expected prefix {prefixes}", file=sys.stderr)
                 return False
 
     return True
