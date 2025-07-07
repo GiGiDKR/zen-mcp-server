@@ -14,7 +14,10 @@ echo ""
 # Activate virtual environment
 if [[ -f ".zen_venv/bin/activate" ]]; then
     source .zen_venv/bin/activate
-    echo "✅ Using virtual environment"
+    echo "✅ Using virtual environment (Unix/Linux/macOS)"
+elif [[ -f ".zen_venv/Scripts/activate" ]]; then
+    source .zen_venv/Scripts/activate
+    echo "✅ Using virtual environment (Windows)"
 else
     echo "❌ No virtual environment found!"
     echo "Please run: ./run-server.sh first"

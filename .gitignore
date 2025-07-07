@@ -184,3 +184,10 @@ CLAUDE.local.md
 logs/
 *.backup
 /.desktop_configured
+
+.github/instructions/
+.github/chatmodes/
+.github/prompts/
+.github/copilot-instructions.md
+.notes/
+.contexte/

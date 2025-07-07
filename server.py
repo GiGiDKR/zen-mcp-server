@@ -62,6 +62,13 @@ from config import (  # noqa: E402
     DEFAULT_MODEL,
     __version__,
 )
+from personas.tools import (  # noqa: E402
+    PersonasCreateTool,
+    PersonasDeleteTool,
+    PersonasListTool,
+    PersonasSelectTool,
+    PersonasUpdateTool,
+)
 from tools import (  # noqa: E402
     AnalyzeTool,
     ChallengeTool,
@@ -278,6 +285,12 @@ TOOLS = {
     "challenge": ChallengeTool(),  # Critical challenge prompt wrapper to avoid automatic agreement
     "listmodels": ListModelsTool(),  # List all available AI models by provider
     "version": VersionTool(),  # Display server version and system information
+    # Personas management tools
+    "personas_list": PersonasListTool(),  # List available personas with filtering
+    "personas_create": PersonasCreateTool(),  # Create new personas with validation
+    "personas_update": PersonasUpdateTool(),  # Update existing personas
+    "personas_delete": PersonasDeleteTool(),  # Delete personas with confirmation
+    "personas_select": PersonasSelectTool(),  # Select and activate personas
 }
 TOOLS = filter_disabled_tools(TOOLS)
 

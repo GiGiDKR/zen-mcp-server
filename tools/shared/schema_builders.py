@@ -46,6 +46,10 @@ class SchemaBuilder:
             "items": {"type": "string"},
             "description": COMMON_FIELD_DESCRIPTIONS["images"],
         },
+        "persona_id": {
+            "type": "string",
+            "description": COMMON_FIELD_DESCRIPTIONS["persona_id"],
+        },
     }
 
     # Simple tool-specific field schemas (workflow tools use relevant_files instead)

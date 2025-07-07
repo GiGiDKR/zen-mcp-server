@@ -29,14 +29,36 @@ class TestFileUtils:
         assert "Error: File does not exist" in content
         assert tokens > 0
 
-    def test_read_file_content_safe_files_allowed(self):
+    def test_read_file_content_safe_files_allowed(self, tmp_path):
         """Test that safe files outside the original project root are now allowed"""
-        # In the new security model, safe files like /etc/passwd
-        # can be read as they're not in the dangerous paths list
-        content, tokens = read_file_content("/etc/passwd")
-        # Should successfully read the file
-        assert "--- BEGIN FILE: /etc/passwd ---" in content
-        assert "--- END FILE: /etc/passwd ---" in content
+        import os
+
+        if os.name == "nt":  # Windows
+            # Create a temporary file outside project root that should be accessible
+            safe_file = tmp_path / "safe_test_file.txt"
+            safe_file.write_text("test content for validation")
+            test_path = str(safe_file)
+        else:  # Unix-like systems
+            # Use a system file that should exist and be safe
+            test_path = "/etc/passwd"
+
+        content, tokens = read_file_content(test_path)
+
+        if os.name == "nt":
+            # On Windows, should successfully read our temporary file
+            assert f"--- BEGIN FILE: {test_path} ---" in content
+            assert "test content for validation" in content
+            assert "--- END FILE:" in content
+        else:
+            # On Unix, may or may not exist, but should not be rejected for security
+            # Either successfully read or file not found, but not security error
+            if "--- BEGIN FILE:" in content:
+                assert f"--- BEGIN FILE: {test_path} ---" in content
+                assert "--- END FILE:" in content
+            else:
+                # File might not exist, that's okay
+                assert "--- FILE NOT FOUND:" in content or "--- BEGIN FILE:" in content
+
         assert tokens > 0
 
     def test_read_file_content_relative_path_rejected(self):

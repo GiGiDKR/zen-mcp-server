@@ -148,6 +148,15 @@ class ChatTool(SimpleTool):
                         "conversation thread."
                     ),
                 },
+                "persona_id": {
+                    "type": "string",
+                    "description": (
+                        "ID of the persona to use for this tool execution. When specified, the persona's "
+                        "system instructions will be combined with the tool's base prompt, and the persona's "
+                        "model preferences (temperature, thinking_mode, etc.) will be applied. "
+                        "Use this to get specialized behavior for specific roles or expertise domains."
+                    ),
+                },
             },
             "required": ["prompt"] + (["model"] if self.is_effective_auto_mode() else []),
         }

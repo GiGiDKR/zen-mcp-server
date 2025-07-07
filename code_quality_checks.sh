@@ -13,7 +13,11 @@ echo "================================================="
 if [[ -f ".zen_venv/bin/python" ]]; then
     PYTHON_CMD=".zen_venv/bin/python"
     PIP_CMD=".zen_venv/bin/pip"
-    echo "✅ Using venv"
+    echo "✅ Using venv (Unix/Linux/macOS)"
+elif [[ -f ".zen_venv/Scripts/python.exe" ]]; then
+    PYTHON_CMD=".zen_venv/Scripts/python.exe"
+    PIP_CMD=".zen_venv/Scripts/pip.exe"
+    echo "✅ Using venv (Windows)"
 elif [[ -n "$VIRTUAL_ENV" ]]; then
     PYTHON_CMD="python"
     PIP_CMD="pip"
@@ -54,6 +58,11 @@ if [[ -f ".zen_venv/bin/ruff" ]]; then
     BLACK=".zen_venv/bin/black"
     ISORT=".zen_venv/bin/isort"
     PYTEST=".zen_venv/bin/pytest"
+elif [[ -f ".zen_venv/Scripts/ruff.exe" ]]; then
+    RUFF=".zen_venv/Scripts/ruff.exe"
+    BLACK=".zen_venv/Scripts/black.exe"
+    ISORT=".zen_venv/Scripts/isort.exe"
+    PYTEST=".zen_venv/Scripts/pytest.exe"
 else
     RUFF="ruff"
     BLACK="black"

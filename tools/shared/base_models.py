@@ -54,6 +54,12 @@ COMMON_FIELD_DESCRIPTIONS = {
         "visual problems, error screens, architecture mockups, and visual analysis tasks."
     ),
     "files": ("Optional files for context (must be FULL absolute paths to real files / folders - DO NOT SHORTEN)"),
+    "persona_id": (
+        "ID of the persona to use for this tool execution. When specified, the persona's "
+        "system instructions will be combined with the tool's base prompt, and the persona's "
+        "model preferences (temperature, thinking_mode, etc.) will be applied. "
+        "Use this to get specialized behavior for specific roles or expertise domains."
+    ),
 }
 
 # Workflow-specific field descriptions
@@ -104,6 +110,9 @@ class ToolRequest(BaseModel):
 
     # Visual context
     images: Optional[list[str]] = Field(None, description=COMMON_FIELD_DESCRIPTIONS["images"])
+
+    # Persona support
+    persona_id: Optional[str] = Field(None, description=COMMON_FIELD_DESCRIPTIONS["persona_id"])
 
 
 class BaseWorkflowRequest(ToolRequest):

@@ -12,9 +12,12 @@ and inherit all the conversation, file processing, and model handling
 capabilities from BaseTool.
 """
 
+import logging
 from abc import abstractmethod
 from typing import Any, Optional
 
+from personas import PersonaManager
+from personas.exceptions import PersonaNotFoundError
 from tools.shared.base_models import ToolRequest
 from tools.shared.base_tool import BaseTool
 from tools.shared.schema_builders import SchemaBuilder
@@ -59,6 +62,10 @@ class SimpleTool(BaseTool):
     # Common field definitions that simple tools can reuse
     FILES_FIELD = SchemaBuilder.SIMPLE_FIELD_SCHEMAS["files"]
     IMAGES_FIELD = SchemaBuilder.COMMON_FIELD_SCHEMAS["images"]
+    PERSONA_FIELD = {
+        "type": "string",
+        "description": "ID of the persona to use for this tool execution",
+    }
 
     @abstractmethod
     def get_tool_fields(self) -> dict[str, dict[str, Any]]:
@@ -241,6 +248,13 @@ class SimpleTool(BaseTool):
         except AttributeError:
             return True
 
+    def get_request_persona_id(self, request) -> Optional[str]:
+        """Get persona_id from request. Override for custom persona handling."""
+        try:
+            return request.persona_id
+        except AttributeError:
+            return None
+
     def get_request_as_dict(self, request) -> dict:
         """Convert request to dictionary. Override for custom serialization."""
         try:
@@ -306,8 +320,8 @@ class SimpleTool(BaseTool):
                 )
                 return [TextContent(type="text", text=error_output.model_dump_json())]
 
-            # Handle model resolution like old base.py
-            model_name = self.get_request_model_name(request)
+            # Handle model resolution with persona support
+            model_name = self.get_effective_model_name(request)
             if not model_name:
                 from config import DEFAULT_MODEL
 
@@ -411,10 +425,21 @@ class SimpleTool(BaseTool):
             # Get the provider from model context (clean OOP - no re-fetching)
             provider = self._model_context.provider
 
-            # Get system prompt for this tool
-            base_system_prompt = self.get_system_prompt()
+            # Get effective system prompt (with persona if specified)
+            effective_system_prompt = self.get_effective_system_prompt(request)
             language_instruction = self.get_language_instruction()
-            system_prompt = language_instruction + base_system_prompt
+            system_prompt = language_instruction + effective_system_prompt
+
+            # Get effective model preferences (with persona if specified)
+            effective_model_preferences = self.get_effective_model_preferences(request)
+
+            # Apply persona temperature if available
+            if effective_model_preferences.get("temperature") is not None:
+                temperature = effective_model_preferences["temperature"]
+
+            # Apply persona thinking mode if available
+            if effective_model_preferences.get("thinking_mode") is not None:
+                thinking_mode = effective_model_preferences["thinking_mode"]
 
             # Generate AI response using the provider
             logger.info(f"Sending request to {provider.get_provider_type().value} API for {self.get_name()}")
@@ -714,6 +739,125 @@ class SimpleTool(BaseTool):
 Please provide a thoughtful, comprehensive response:"""
 
         return full_prompt
+
+    def get_effective_system_prompt(self, request) -> str:
+        """
+        Get the effective system prompt combining tool and persona instructions.
+
+        This method combines the base tool system prompt with persona-specific
+        instructions if a persona_id is provided in the request.
+
+        Args:
+            request: The validated request object
+
+        Returns:
+            Combined system prompt with persona instructions if applicable
+        """
+        base_prompt = self.get_system_prompt()
+
+        # Check if a persona is specified
+        persona_id = self.get_request_persona_id(request)
+        if not persona_id:
+            return base_prompt
+
+        try:
+            # Get persona manager and retrieve persona
+            manager = PersonaManager.get_instance()
+            persona = manager.get_persona(persona_id)
+
+            # Combine base prompt with persona instructions
+            combined_prompt = f"""{base_prompt}
+
+=== PERSONA INSTRUCTIONS ===
+{persona.system_instructions}
+=== END PERSONA INSTRUCTIONS ==="""
+
+            logger = logging.getLogger(f"tools.{self.get_name()}")
+            logger.debug(f"Using persona '{persona_id}' for {self.get_name()} tool")
+            return combined_prompt
+
+        except PersonaNotFoundError:
+            logger = logging.getLogger(f"tools.{self.get_name()}")
+            logger.warning(f"Persona '{persona_id}' not found, using base prompt for {self.get_name()}")
+            return base_prompt
+        except Exception as e:
+            logger = logging.getLogger(f"tools.{self.get_name()}")
+            logger.error(f"Error loading persona '{persona_id}': {e}, using base prompt")
+            return base_prompt
+
+    def get_effective_model_preferences(self, request) -> dict[str, Any]:
+        """
+        Get effective model preferences combining tool defaults and persona preferences.
+
+        This method returns model preferences from the specified persona,
+        falling back to tool defaults if no persona is specified or found.
+
+        Args:
+            request: The validated request object
+
+        Returns:
+            Dictionary of model preferences (temperature, thinking_mode, etc.)
+        """
+        persona_id = self.get_request_persona_id(request)
+        if not persona_id:
+            return {}
+
+        try:
+            # Get persona manager and retrieve persona
+            manager = PersonaManager.get_instance()
+            persona = manager.get_persona(persona_id)
+
+            # Extract non-None preferences
+            preferences = {}
+            if persona.model_preferences.temperature is not None:
+                preferences["temperature"] = persona.model_preferences.temperature
+            if persona.model_preferences.thinking_mode is not None:
+                preferences["thinking_mode"] = persona.model_preferences.thinking_mode
+            if persona.model_preferences.top_p is not None:
+                preferences["top_p"] = persona.model_preferences.top_p
+            if persona.model_preferences.max_tokens is not None:
+                preferences["max_tokens"] = persona.model_preferences.max_tokens
+
+            if preferences:
+                logger = logging.getLogger(f"tools.{self.get_name()}")
+                logger.debug(f"Applied persona preferences for '{persona_id}': {list(preferences.keys())}")
+
+            return preferences
+
+        except PersonaNotFoundError:
+            logger = logging.getLogger(f"tools.{self.get_name()}")
+            logger.warning(f"Persona '{persona_id}' not found, using default preferences")
+            return {}
+        except Exception as e:
+            logger = logging.getLogger(f"tools.{self.get_name()}")
+            logger.error(f"Error loading persona preferences '{persona_id}': {e}")
+            return {}
+
+    def get_effective_model_name(self, request) -> Optional[str]:
+        """
+        Get effective model name, preferring persona model over request model.
+
+        Args:
+            request: The validated request object
+
+        Returns:
+            Model name from persona or request, None if neither specified
+        """
+        persona_id = self.get_request_persona_id(request)
+        if persona_id:
+            try:
+                manager = PersonaManager.get_instance()
+                persona = manager.get_persona(persona_id)
+                if persona.model_preferences.model_name:
+                    logger = logging.getLogger(f"tools.{self.get_name()}")
+                    logger.debug(f"Using model '{persona.model_preferences.model_name}' from persona '{persona_id}'")
+                    return persona.model_preferences.model_name
+            except Exception as e:
+                logger = logging.getLogger(f"tools.{self.get_name()}")
+                logger.warning(f"Could not load persona '{persona_id}' for model selection: {e}")
+
+        # Fallback to request model
+        return self.get_request_model_name(request)
 
     def get_prompt_content_for_size_validation(self, user_content: str) -> str:
         """
